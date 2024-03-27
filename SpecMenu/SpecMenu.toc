@@ -1,6 +1,6 @@
 ## Interface: 30300
 ## Title: SpecMenu
-## Notes: Specialization Menu For Ascension
+## Notes: Adds a button to the UI, Left or right click the top half to swap betweeen favorite specs.|n|nLeft click the bottom half for a spec list, or right click for a mystic enchant spec list.
 ## Author: Anch
 ## SavedVariables: SpecMenu
 ## SavedVariablesPerCharacter: SpecMenuDB
