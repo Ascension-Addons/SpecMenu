@@ -55,6 +55,9 @@ local function SpecMenu_LastSpec(event, ...)
     local target, spell = ...
         if event == "ASCENSION_CA_SPECIALIZATION_ACTIVE_ID_CHANGED" or (event == "UNIT_SPELLCAST_SUCCEEDED" and target == "player" and  spell == "Activate Mystic Enchant Preset") then
             local specNum = SPM.specNum
+            if not specNum then
+                return
+            end
             if SPM.lastActiveSpec ~= specNum then
                 SPM.db.LastSpec = SPM.lastActiveSpec
             end
