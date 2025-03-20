@@ -1,4 +1,4 @@
-local SPM = LibStub("AceAddon-3.0"):NewAddon("SpecMenu", "AceConsole-3.0", "AceTimer-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0")
+local SPM = LibStub("AceAddon-3.0"):NewAddon("SpecMenu", "AceConsole-3.0", "AceTimer-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0", "SettingsCreator-1.0")
 SPECMENU = SPM
 SPM.dewdrop = AceLibrary("Dewdrop-2.0")
 local CYAN =  "|cff00ffff"
@@ -7,51 +7,51 @@ local LIMEGREEN = "|cFF32CD32"
 
 --Set Savedvariables defaults
 local DefaultSettings  = {
-    Specs = {{}},
-    EnchantPresets = {{}},
+    Specs = {},
     LastSpec = 1,
-    ShowMenuOnHover = { false, Frame = "SpecMenuFrame", CheckBox = "SpecMenuOptions_ShowOnMouseOver" },
-    HideMenu = { false, Frame = "SpecMenuFrame", CheckBox = "SpecMenuOptions_HideMenu"},
-    minimap = { false, CheckBox = "SpecMenuOptions_HideMinimap"},
-    autoMenu = { false, CheckBox = "SpecMenuOptions_AutoMenu"},
+    ShowMenuOnHover = false,
+    HideMenu = false,
+    minimap = false,
+    autoMenu = false,
     txtSize = 12,
-    enchantSpecs = {{}},
+    enchantSpecs = {},
+    SpecDisplayScale = 1,
 }
 
---[[ DB = Name of the db you want to setup
-CheckBox = Global name of the checkbox if it has one and first numbered table entry is the boolean
-Text = Global name of where the text and first numbered table entry is the default text 
-Frame = Frame or button etc you want hidden/shown at start based on condition ]]
-local function setupSettings(db, defaultList)
-    for table, v in pairs(defaultList) do
-        if not db[table] then
-            if type(v) == "table" then
-                db[table] = v[1]
-            else
-                db[table] = v
-            end
-        end
-        if type(v) == "table" then
-            if v.CheckBox then
-                _G[v.CheckBox]:SetChecked(db[table])
-            end
-            if v.Text then
-                _G[v.Text]:SetText(db[table])
-            end
-            if v.Frame then
-                if db[table] then _G[v.Frame]:Hide() else _G[v.Frame]:Show() end
-            end
-        end
-    end
+function SPM:OnInitialize()
+    self.db = self:SetupDB("SpecMenuDB", DefaultSettings)
+    self.lastActiveSpec = self.db.LastSpec
+    self:RegisterEvent("ADDON_LOADED")
 end
 
+function SPM:OnEnable()
+    self.SpecInfo = SPEC_SWAP_SPELLS
+    local name, icon = self:GetSpecInfo(self:GetSpecId())
+    self.optionsSpecNum = self:GetSpecId()
+    self.class = select(2,UnitClass("player"))
+    self:InitializeMinimap()
+    self:SetMapIcon(icon)
+    self:CreateMainUI(icon)
+    self:PopulateSpecDB()
+    self:CreateOptionsUI()
+    self:CreateSpecDisplay()
+    self:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+    self:RegisterEvent("ASCENSION_CA_SPECIALIZATION_ACTIVE_ID_CHANGED")
+    self:SlashCommandInitialize()
+end
 
+function SPM:UNIT_SPELLCAST_SUCCEEDED(event, ...)
+    self:LastSpec(event, ...)
+end
 
+function SPM:ASCENSION_CA_SPECIALIZATION_ACTIVE_ID_CHANGED(event, ...)
+    self:LastSpec(event, ...)
+end
 
 --[[ checks to see if current spec is not last spec.
 Done this way to stop it messing up last spec if you stop the cast mid way
  ]]
-local function SpecMenu_LastSpec(event, ...)
+function SPM:LastSpec(event, ...)
     local target, spell = ...
         if event == "ASCENSION_CA_SPECIALIZATION_ACTIVE_ID_CHANGED" or (event == "UNIT_SPELLCAST_SUCCEEDED" and target == "player" and  spell == "Activate Mystic Enchant Preset") then
             local specNum = SPM.specNum
@@ -151,7 +151,7 @@ function SPM:DewdropRegister(button, showUnlock)
 				'text', "Options",
                 'textHeight', self.db.txtSize,
                 'textWidth', self.db.txtSize,
-				'func', self.Options_Toggle,
+				'func', self.OptionsToggle,
 				'notCheckable', true,
                 'closeWhenClicked', true
 			)
@@ -180,7 +180,7 @@ function SPM:DewdropRegister(button, showUnlock)
     end
 end
 
-function SPM:EnchantPreset_DewdropClick(presetID)
+function SPM:EnchantSpecClick(presetID)
     if IsMounted() then Dismount() end
         --ascension function for changing enchant presets
             if presetID then
@@ -226,7 +226,7 @@ function SPM:EnchantPreset_DewdropRegister(button)
                                 'textHeight', self.db.txtSize,
                                 'textWidth', self.db.txtSize,
                                 'icon', icon,
-                                'func', function() SPM:EnchantPreset_DewdropClick(i) end
+                                'func', function() SPM:EnchantSpecClick(i) end
                         )
                     end
                 end
@@ -258,7 +258,7 @@ function SPM:EnchantPreset_DewdropRegister(button)
     self.dewdrop:Open(button)
 end
 
-function SPM:Favorite_OnClick(arg1)
+function SPM:FavoriteClick(arg1)
     local specNum
     self.dewdrop:Close()
     if (arg1=="LeftButton") then
@@ -285,7 +285,7 @@ function SPM:Favorite_OnClick(arg1)
     end
 end
 
-function SPM:MainButton_OnClick(button, arg1)
+function SPM:MenuClick(button, arg1)
     GameTooltip:Hide()
     if (arg1=="LeftButton") then
         self:DewdropRegister(button, true)
@@ -294,51 +294,27 @@ function SPM:MainButton_OnClick(button, arg1)
     end
 end
 
-function SPM:ToggleStandaloneButton(toggle)
-    if self.db.ShowMenuOnHover then
-        if toggle == "show" then
-            SpecMenuFrame_Menu:Show()
-            SpecMenuFrame_Favorite:Show()
-            SpecMenuFrame.icon:Show()
-            SpecMenuFrame.Text:Show()
-        else
-            SpecMenuFrame_Menu:Hide()
-            SpecMenuFrame_Favorite:Hide()
-            SpecMenuFrame.icon:Hide()
-            SpecMenuFrame.Text:Hide()
-        end
-    end
-end
-
 -- Used to show highlight as a frame mover
 function SPM:UnlockFrame()
-    if SPM.unlocked then
+    self = SPM
+    if self.unlocked then
         SpecMenuFrame_Menu:Show()
         SpecMenuFrame_Favorite:Show()
         SpecMenuFrame.Highlight:Hide()
-        SPM.unlocked = false
+        self.unlocked = false
         GameTooltip:Hide()
+        if self.db.ShowMenuOnHover then
+            self.standaloneButton:SetAlpha(0)
+        end
     else
         SpecMenuFrame_Menu:Hide()
         SpecMenuFrame_Favorite:Hide()
         SpecMenuFrame.Highlight:Show()
-        SPM.unlocked = true
+        self.unlocked = true
+        if self.db.ShowMenuOnHover then
+            self.standaloneButton:SetAlpha(10)
+        end
     end
-end
-
-InterfaceOptionsFrame:HookScript("OnShow", function()
-    if InterfaceOptionsFrame and SpecMenuOptionsFrame:IsVisible() then
-            SpecMenu_OpenOptions()
-    end
-end)
-
-function SPM:OnInitialize()
-    if not SpecMenuDB then SpecMenuDB = {} end
-    self.db = SpecMenuDB
-    setupSettings(self.db, DefaultSettings)
-    self.lastActiveSpec = self.db.LastSpec
-    self.optionsSpecNum = self:GetSpecId()
-    self:RegisterEvent("ADDON_LOADED")
 end
 
 function SPM:ADDON_LOADED(event, arg1, arg2, arg3)
@@ -354,10 +330,10 @@ end
 
 -- toggle the main button frame
 function SPM:ToggleMainFrame()
-    if SpecMenuFrame:IsVisible() then
-        SpecMenuFrame:Hide()
+    if self.standaloneButton:IsVisible() then
+        self.standaloneButton:Hide()
     else
-        SpecMenuFrame:Show()
+        self.standaloneButton:Show()
     end
 end
 
@@ -366,35 +342,23 @@ SlashCommand(msg):
 msg - takes the argument for the /mysticextended command so that the appropriate action can be performed
 If someone types /mysticextended, bring up the options box
 ]]
-local function SlashCommand(msg)
-    if msg == "reset" then
-        SpecMenuDB = nil
-        SPM:OnInitialize()
-        DEFAULT_CHAT_FRAME:AddMessage("Settings Reset")
-    elseif msg == "options" then
-        SPM:Options_Toggle()
-    else
-        SPM:ToggleMainFrame()
+function SPM:SlashCommandInitialize()
+    local function SlashCommand(msg)
+        if msg == "reset" then
+            SpecMenuDB = nil
+            self:OnInitialize()
+            DEFAULT_CHAT_FRAME:AddMessage("Settings Reset")
+        elseif msg == "options" then
+            SPM:OptionsToggle()
+        elseif msg == "resetbutton" then
+            self.standaloneButton:Show()
+            self.standaloneButton:ClearAllPoints()
+            self.standaloneButton:SetPoint("CENTER",UIParent ,"CENTER",0,0)
+        else
+            self:ToggleMainFrame()
+        end
     end
-end
 
-function SPM:OnEnable()
-    self.SpecInfo = SPEC_SWAP_SPELLS
-    local name, icon = self:GetSpecInfo(self:GetSpecId())
-    SpecMenuFrame.icon:SetTexture(icon)
-    SPM:InitializeMinimap()
-    SPM:SetMapIcon(icon)
-    
-    self.class = select(2,UnitClass("player"))
-    self:PopulateSpecDB()
-    self:OptionsDropDownInitialize()
-    self:ToggleStandaloneButton("hide")
-    self.specDisplayLoaded = false
-    self:CreateSpecDisplay()
-    self:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED", SpecMenu_LastSpec)
-    self:RegisterEvent("ASCENSION_CA_SPECIALIZATION_ACTIVE_ID_CHANGED", SpecMenu_LastSpec)
-    self.standaloneFrame:SetScale(self.db.buttonScale or 1)
-    self.db.EnchantPresets = nil
     --Enable the use of /me or /mysticextended to open the loot browser
     SLASH_SPECMENU1 = "/specmenu"
     SLASH_SPECMENU2 = "/spm"
@@ -433,5 +397,13 @@ function SPM:SetDisplayText()
         SpecDisplayFrame:SetWidth(SpecDisplayFrame.text:GetWidth() +30)
     else
         SpecDisplayFrame:SetWidth(SpecDisplayFrame.text2:GetWidth() +30)
+    end
+end
+
+function SPM:SetFrameAlpha()
+    if self.db.ShowMenuOnHover then
+        self.standaloneButton:SetAlpha(0)
+    else
+        self.standaloneButton:SetAlpha(10)
     end
 end
